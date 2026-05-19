@@ -1,11 +1,13 @@
 // sw.js - Service Worker متقدم لتخزين الموقع بالكامل على متصفحات الزوار
 // الإصدار النهائي - يدعم التخزين المؤقت، التحديث التلقائي، والعمل بدون إنترنت
+// مع عرض صفحة offline.html عند انقطاع الاتصال
 
-const CACHE_NAME = 'asawq-store-v5';
+const CACHE_NAME = 'asawq-store-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/admin.html',
+  '/offline.html',
   '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css',
@@ -69,6 +71,7 @@ self.addEventListener('fetch', event => {
       url.pathname === '/' ||
       url.pathname === '/index.html' ||
       url.pathname === '/admin.html' ||
+      url.pathname === '/offline.html' ||
       url.pathname === '/manifest.json') {
     
     event.respondWith(
@@ -80,7 +83,10 @@ self.addEventListener('fetch', event => {
             });
           }
           return networkResponse;
-        }).catch(() => cachedResponse);
+        }).catch(() => {
+          // عند فشل الشبكة، نعيد الصفحة المخزنة مؤقتاً، أو صفحة offline.html
+          return cachedResponse || caches.match('/offline.html');
+        });
         
         return cachedResponse || fetchPromise;
       })
@@ -97,7 +103,7 @@ self.addEventListener('fetch', event => {
             caches.open(CACHE_NAME).then(cache => cache.put(request, res.clone()));
           }
           return res;
-        }).catch(() => null);
+        }).catch(() => cached);
         return cached || fetchPromise;
       })
     );
@@ -111,7 +117,10 @@ self.addEventListener('fetch', event => {
         caches.open(CACHE_NAME).then(cache => cache.put(request, networkResponse.clone()));
       }
       return networkResponse;
-    }).catch(() => caches.match(request))
+    }).catch(() => {
+      // إذا فشلت الشبكة ولم يوجد في الكاش، نعرض صفحة offline.html
+      return caches.match('/offline.html');
+    })
   );
 });
 
