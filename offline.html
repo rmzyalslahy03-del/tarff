@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>غير متصل - مجمع أسواق ريادة المستهلك</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(145deg, #f0f9ff 0%, #e2edf7 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            direction: rtl;
+        }
+        .offline-card {
+            max-width: 500px;
+            width: 100%;
+            background: white;
+            border-radius: 48px;
+            padding: 40px 32px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            animation: fadeInUp 0.6s ease-out;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .icon-wrapper {
+            background: #fee2e2;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+        .icon-wrapper i {
+            font-size: 48px;
+            color: #dc2626;
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 12px;
+        }
+        .subtitle {
+            color: #475569;
+            font-size: 16px;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .info-box {
+            background: #f8fafc;
+            border-radius: 24px;
+            padding: 20px;
+            margin: 24px 0;
+            text-align: right;
+        }
+        .info-box p {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #1e293b;
+            font-size: 14px;
+        }
+        .info-box i {
+            width: 24px;
+            color: #3b82f6;
+        }
+        .retry-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 60px;
+            font-size: 18px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 16px;
+            width: 100%;
+            justify-content: center;
+        }
+        .retry-btn:hover {
+            background: #2563eb;
+            transform: scale(1.02);
+        }
+        .contact-links {
+            margin-top: 28px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .contact-links a {
+            color: #64748b;
+            font-size: 24px;
+            transition: color 0.2s, transform 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            background: #f1f5f9;
+            border-radius: 50%;
+            text-decoration: none;
+        }
+        .contact-links a:hover {
+            color: #3b82f6;
+            transform: translateY(-3px);
+            background: #e2e8f0;
+        }
+        .footer-note {
+            margin-top: 32px;
+            font-size: 12px;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+        @media (max-width: 480px) {
+            .offline-card { padding: 32px 24px; }
+            h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-card">
+        <div class="icon-wrapper">
+            <i class="fas fa-wifi-slash"></i>
+        </div>
+        <h1>أنت غير متصل بالإنترنت</h1>
+        <div class="subtitle">
+            يبدو أن هناك مشكلة في الاتصال. تم حفظ نسخة من المتجر على جهازك، لكن بعض المحتويات قد لا تكون محدثة.
+        </div>
+        <div class="info-box">
+            <p><i class="fas fa-clock"></i> يمكنك تصفح المنتجات والمتاجر التي زرتها سابقاً.</p>
+            <p><i class="fas fa-sync-alt"></i> بمجرد عودة الاتصال، سيتم تحديث كل شيء تلقائياً.</p>
+            <p><i class="fas fa-heart"></i> لا تقلق، سلة التسوق والمفضلة لديك آمنة.</p>
+        </div>
+        <button class="retry-btn" id="retryBtn" onclick="location.reload()">
+            <i class="fas fa-arrow-rotate-right"></i> إعادة المحاولة
+        </button>
+        <div class="contact-links">
+            <a href="tel:778562099" target="_blank"><i class="fas fa-phone-alt"></i></a>
+            <a href="https://wa.me/778562099" target="_blank"><i class="fab fa-whatsapp"></i></a>
+            <a href="mailto:ramzealsalhy@gmail.com" target="_blank"><i class="far fa-envelope"></i></a>
+        </div>
+        <div class="footer-note">
+            <i class="fas fa-store"></i> مجمع أسواق ريادة المستهلك – نعمل على تحسين تجربتك
+        </div>
+    </div>
+
+    <script>
+        // محاولة إعادة الاتصال تلقائياً عند عودة الإنترنت
+        window.addEventListener('online', () => {
+            location.reload();
+        });
+        // إضافة مستمع لزر إعادة المحاولة يدوياً
+        document.getElementById('retryBtn')?.addEventListener('click', () => {
+            location.reload();
+        });
+    </script>
+</body>
+</html>
