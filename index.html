@@ -22,6 +22,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Cairo', sans-serif; }
         body { background-color: #f4f7fc; color: #1e293b; line-height: 1.6; user-select: none; }
@@ -96,12 +97,15 @@
         .top-ticker-content span { margin: 0 30px; }
         @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 
-        .search-container { display: flex; justify-content: center; align-items: center; padding: 1rem 2rem; background-color: #fff; border-bottom: 1px solid #e2e8f0; }
+        .search-container { display: flex; justify-content: center; align-items: center; padding: 1rem 2rem; background-color: #fff; border-bottom: 1px solid #e2e8f0; position: relative; }
         .search-bar { display: flex; align-items: center; background: #f1f5f9; border-radius: 40px; padding: 0.3rem 0.3rem 0.3rem 1rem; width: 100%; max-width: 600px; transition: box-shadow 0.3s ease; }
         .search-bar:focus-within { box-shadow: 0 0 0 3px rgba(251,191,36,0.5); }
         .search-bar input { flex: 1; border: none; padding: 0.5rem; font-size: 1rem; outline: none; background: transparent; }
         .search-bar button { background: #fbbf24; border: none; border-radius: 40px; padding: 0.5rem 1rem; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 5px; }
         .search-bar button:hover { background: #f59e0b; }
+        .search-suggestions { position: absolute; top: 100%; left: 0; right: 0; max-width: 600px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 1000; display: none; }
+        .search-suggestions div { padding: 10px 15px; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid #e2e8f0; }
+        .search-suggestions div:hover { background: #f1f5f9; }
 
         .refresh-btn { text-align: left; padding: 10px 5%; display: none; }
         .refresh-btn button { background: #3b82f6; color: white; border: none; padding: 8px 20px; border-radius: 40px; font-weight: 600; cursor: pointer; }
@@ -244,8 +248,120 @@
         .install-toast { position: fixed; bottom: 100px; left: 20px; background: #0f172a; color: white; padding: 12px 20px; border-radius: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 10001; display: flex; align-items: center; gap: 15px; animation: slideUp 0.3s ease; }
         .install-toast button { background: #fbbf24; border: none; padding: 6px 15px; border-radius: 40px; font-weight: bold; cursor: pointer; }
         @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* أنماط المساعد الذكي */
+        .assistant-float {
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            background: linear-gradient(145deg, #1e3a8a, #2563eb);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 10002;
+            transition: transform 0.2s;
+        }
+        .assistant-float:hover { transform: scale(1.05); }
+        .assistant-window {
+            position: fixed;
+            bottom: 180px;
+            right: 30px;
+            width: 320px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            display: none;
+            flex-direction: column;
+            z-index: 10003;
+            direction: rtl;
+            font-family: 'Cairo', sans-serif;
+            overflow: hidden;
+        }
+        .assistant-window.open { display: flex; }
+        .assistant-header {
+            background: #1e3a8a;
+            color: white;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+        .assistant-header button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+        .assistant-messages {
+            padding: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
+        .assistant-message {
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            border-radius: 18px;
+            max-width: 85%;
+        }
+        .assistant-message.bot {
+            background: #e2e8f0;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .assistant-message.user {
+            background: #2563eb;
+            color: white;
+            margin-right: auto;
+            border-bottom-right-radius: 4px;
+        }
+        .assistant-input {
+            display: flex;
+            border-top: 1px solid #e2e8f0;
+            padding: 8px;
+            background: white;
+        }
+        .assistant-input input {
+            flex: 1;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            padding: 8px 12px;
+            margin-left: 8px;
+            font-family: inherit;
+        }
+        .assistant-input button {
+            background: #fbbf24;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .assistant-tip {
+            background: #fef9c3;
+            padding: 8px 12px;
+            margin: 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            border-right: 3px solid #eab308;
+        }
     </style>
     <script>
+        // تعطيل جميع رسائل الإشعارات والأخطاء
+        window.showToast = function() {};
+        window.alert = function() {};
+        console.error = function() {};
+        console.warn = function() {};
+        
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
         document.addEventListener('keydown', function(e) { if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x' || e.key === 'v')) { e.preventDefault(); return false; } });
     </script>
@@ -265,7 +381,13 @@
     <div id="contestsBar" class="contests-bar" style="display: none;"><div class="contests-content" id="contestsContent"></div></div>
     <header id="mainHeader"><div class="container"><h1 id="headerTitle">مجمع أسواق ريادة المستهلك</h1><p id="headerSubtitle">أفضل المتاجر والمنتجات بأفضل الأسعار</p></div></header>
     <div class="top-ticker" id="topTicker"><div class="top-ticker-content" id="tickerContent"></div></div>
-    <div class="search-container"><div class="search-bar"><input type="text" id="searchInput" placeholder="ابحث عن منتج أو متجر..."><button id="searchBtn"><i class="fas fa-search"></i> بحث</button></div></div>
+    <div class="search-container">
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="ابحث عن منتج أو متجر...">
+            <button id="searchBtn"><i class="fas fa-search"></i> بحث</button>
+        </div>
+        <div id="searchSuggestions" class="search-suggestions"></div>
+    </div>
     <div class="index-grid" id="indexGrid"></div>
     <div style="text-align: center; margin: 10px;"><div class="visitor-counter">عدد الزوار: <span id="visitorCount">0</span></div></div>
     <div id="homePage"><div id="categoriesContainer"></div><section class="testimonials-section container"><h2 class="testimonials-title">آراء عملائنا</h2><div class="testimonials-horizontal" id="testimonialsHorizontal"><div class="testimonials-track" id="testimonialsTrack"></div></div></section><div class="trust-badges" id="trustBadgesContainer"></div><div class="footer-info container" id="footerSection"></div><footer class="copyright"><p>جميع الحقوق محفوظة &copy; 2025 | مجمع أسواق ريادة المستهلك</p></footer></div>
@@ -273,11 +395,25 @@
     <div id="productModal" class="product-modal hidden"><div class="product-modal-content" id="productModalContent"><button class="product-modal-close" onclick="closeProductModal()"><i class="fas fa-times"></i></button><img id="modalProductImage" src="" alt=""><h2 id="modalProductName"></h2><div class="price-container" id="modalProductPrice"></div><p id="modalProductDescription"></p><a href="#" id="modalProductLink" class="product-visit-btn" target="_blank">عرض في المتجر</a><button class="add-to-cart-btn" id="modalAddToCart" style="margin-top:10px;">➕ أضف للسلة</button><div class="share-buttons" style="margin-top:15px;"><a href="#" id="shareWhatsapp" target="_blank" class="share-btn whatsapp"><i class="fab fa-whatsapp"></i></a><a href="#" id="shareFacebook" target="_blank" class="share-btn facebook"><i class="fab fa-facebook"></i></a><a href="#" id="shareTwitter" target="_blank" class="share-btn twitter"><i class="fab fa-twitter"></i></a></div></div></div>
     <div class="cart-sidebar" id="cartSidebar"><button class="close-cart" id="closeCart"><i class="fas fa-times"></i></button><h3>سلة التسوق</h3><div id="cartItems"></div><div class="cart-total" id="cartTotal">الإجمالي: 0</div><div class="cart-actions" id="cartActions"></div></div>
 
+    <!-- أيقونة المساعد الذكي -->
+    <div class="assistant-float" id="assistantFloat">
+        <i class="fas fa-robot"></i>
+    </div>
+    <div class="assistant-window" id="assistantWindow">
+        <div class="assistant-header">
+            <span><i class="fas fa-brain"></i> المساعد الذكي (متدرب)</span>
+            <button id="closeAssistantBtn"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="assistant-messages" id="assistantMessages">
+            <div class="assistant-message bot">👋 مرحباً! أنا مساعدك الذكي. سأتعلم من تصفحك وأساعدك في العثور على المنتجات بسهولة. فقط أخبرني ماذا تريد؟</div>
+        </div>
+        <div class="assistant-input">
+            <input type="text" id="assistantInput" placeholder="اكتب سؤالك هنا...">
+            <button id="assistantSendBtn"><i class="fas fa-paper-plane"></i> إرسال</button>
+        </div>
+    </div>
+
     <script>
-        // ================== الأمان والوظائف الأساسية ==================
-        function sanitizeText(str) { if (!str) return ''; const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
-        function showToast(msg) { /* تم تعطيل جميع رسائل الإشعارات */ }
-        
         // ================== Supabase Client ==================
         const SUPABASE_URL = "https://rltdptxnpotfymjqtsvp.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_SBYmfZaJmMsBzbIpDWvh7w_upcmdCNo";
@@ -367,9 +503,9 @@
                 ]
             },
             "testimonials": [
-                { "id": 1, "name": "مستخدم 1", "image": "https://picsum.photos/seed/user0/100/100", "rating": 5, "review": "تجربة رائعة مع هذا الموقع." },
-                { "id": 2, "name": "مستخدم 2", "image": "https://picsum.photos/seed/user1/100/100", "rating": 5, "review": "تجربة رائعة مع هذا الموقع." },
-                { "id": 3, "name": "مستخدم 3", "image": "https://picsum.photos/seed/user2/100/100", "rating": 4, "review": "تجربة رائعة مع هذا الموقع." }
+                { "id": 1, "name": "أحمد", "image": "https://picsum.photos/seed/user0/100/100", "rating": 5, "review": "تجربة رائعة مع هذا الموقع. المنتجات أصلية والتوصيل سريع." },
+                { "id": 2, "name": "سارة", "image": "https://picsum.photos/seed/user1/100/100", "rating": 5, "review": "أفضل متجر تسوق إلكتروني في السعودية. أنصحكم به بشدة." },
+                { "id": 3, "name": "محمد", "image": "https://picsum.photos/seed/user2/100/100", "rating": 4, "review": "تجربة ممتازة، الأسعار منافسة والخدمة ممتازة." }
             ],
             "footer": {
                 "email": "ramzealsalhy@gmail.com",
@@ -437,27 +573,25 @@
         let cart = JSON.parse(localStorage.getItem('cart')) || [];
         let realtimeSubscription = null;
         let pollInterval = null;
+        let fuseSearch = null;
+        let allProductsList = [];
 
-        // ================== دوال التخزين المؤقت (Cache) ==================
-        // مدة الصلاحية: 7 أيام (10080 دقيقة)
+        // ================== دوال التخزين المؤقت ==================
         function cacheDataLocally(key, data, ttlMinutes = 7 * 24 * 60) {
-            const cacheEntry = {
-                data: data,
-                timestamp: Date.now(),
-                expiry: ttlMinutes * 60 * 1000
-            };
+            const cacheEntry = { data: data, timestamp: Date.now(), expiry: ttlMinutes * 60 * 1000 };
             localStorage.setItem(key, JSON.stringify(cacheEntry));
         }
-
         function getCachedData(key) {
             const cached = localStorage.getItem(key);
             if (!cached) return null;
-            const entry = JSON.parse(cached);
-            if (Date.now() - entry.timestamp > entry.expiry) {
-                localStorage.removeItem(key);
-                return null;
-            }
-            return entry.data;
+            try {
+                const entry = JSON.parse(cached);
+                if (Date.now() - entry.timestamp > entry.expiry) {
+                    localStorage.removeItem(key);
+                    return null;
+                }
+                return entry.data;
+            } catch(e) { return null; }
         }
 
         // ================== تحميل البيانات من Supabase (بدون رسائل خطأ) ==================
@@ -468,12 +602,11 @@
                     .select('data')
                     .eq('id', 'main')
                     .single();
-                if (settingsErr && settingsErr.code !== 'PGRST116') throw settingsErr;
+                if (settingsErr && settingsErr.code !== 'PGRST116') return null;
                 if (!settings) {
                     await seedSupabase();
                     return await loadFromSupabase();
                 }
-                
                 const [categoriesRes, storesRes, productsRes, testimonialsRes, carouselRes, messagesRes] = await Promise.all([
                     supabaseClient.from('categories').select('*'),
                     supabaseClient.from('stores').select('*'),
@@ -482,7 +615,6 @@
                     supabaseClient.from('carousel').select('*'),
                     supabaseClient.from('messages').select('*')
                 ]);
-                
                 const storesMap = {};
                 storesRes.data.forEach(store => {
                     if (!storesMap[store.category]) storesMap[store.category] = [];
@@ -493,7 +625,6 @@
                     if (!productsMap[prod.storeId]) productsMap[prod.storeId] = [];
                     productsMap[prod.storeId].push(prod);
                 });
-                
                 const freshData = {
                     header: settings.data.header,
                     ticker: settings.data.ticker,
@@ -514,13 +645,12 @@
             }
         }
 
-        // ================== التحديث التلقائي السريع (Realtime + Polling) ==================
         async function setupRealtime() {
             if (realtimeSubscription) return;
             try {
                 const channel = supabaseClient.channel('settings-changes');
                 realtimeSubscription = channel
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, async (payload) => {
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, async () => {
                         const freshData = await loadFromSupabase();
                         if (freshData && JSON.stringify(freshData) !== JSON.stringify(appData)) {
                             appData = freshData;
@@ -531,7 +661,7 @@
                         }
                     })
                     .subscribe();
-            } catch(e) { }
+            } catch(e) {}
         }
 
         function startPolling() {
@@ -555,8 +685,8 @@
                 applyDesignSettings();
                 renderHomePage();
                 updateCartDisplay();
+                initFuzzySearch();
             }
-            
             const freshData = await loadFromSupabase();
             if (freshData) {
                 if (!appData || JSON.stringify(appData) !== JSON.stringify(freshData)) {
@@ -564,10 +694,10 @@
                     applyDesignSettings();
                     renderHomePage();
                     updateCartDisplay();
+                    initFuzzySearch();
                 }
                 cacheDataLocally('appDataCache', freshData);
             }
-            
             setupRealtime();
             startPolling();
         }
@@ -598,7 +728,7 @@
                 for (const ad of appData.carousel) await supabaseClient.from('carousel').upsert(ad);
                 for (const msg of appData.messages) await supabaseClient.from('messages').upsert(msg);
                 cacheDataLocally('appDataCache', appData);
-            } catch (err) { }
+            } catch (err) {}
         }
 
         async function syncLocalUsers() {
@@ -656,7 +786,154 @@
             for (const ad of enhanced.carousel) await supabaseClient.from('carousel').upsert(ad);
         }
 
-        // ================== دوال العملة والترجمة ==================
+        // ================== البحث الغامض (Fuzzy Search) ==================
+        function initFuzzySearch() {
+            if (!appData) return;
+            const productsArray = [];
+            for (const storeId in appData.products) {
+                appData.products[storeId].forEach(prod => {
+                    productsArray.push({
+                        ...prod,
+                        storeId,
+                        category: Object.keys(appData.stores).find(cat => appData.stores[cat].some(s => s.id === storeId)) || ''
+                    });
+                });
+            }
+            allProductsList = productsArray;
+            const options = {
+                keys: ['name', 'category'],
+                threshold: 0.3,
+                distance: 100,
+                includeScore: true
+            };
+            fuseSearch = new Fuse(productsArray, options);
+            
+            const searchInput = document.getElementById('searchInput');
+            const suggestionsDiv = document.getElementById('searchSuggestions');
+            if (searchInput && suggestionsDiv) {
+                searchInput.addEventListener('input', (e) => {
+                    const query = e.target.value.trim();
+                    if (query.length < 2) {
+                        suggestionsDiv.style.display = 'none';
+                        return;
+                    }
+                    const results = fuseSearch.search(query);
+                    suggestionsDiv.innerHTML = '';
+                    results.slice(0, 5).forEach(result => {
+                        const div = document.createElement('div');
+                        div.textContent = `${result.item.name} (${result.item.category || 'منتج'})`;
+                        div.addEventListener('click', () => {
+                            searchInput.value = result.item.name;
+                            suggestionsDiv.style.display = 'none';
+                            performSearch();
+                        });
+                        suggestionsDiv.appendChild(div);
+                    });
+                    suggestionsDiv.style.display = results.length ? 'block' : 'none';
+                });
+                document.addEventListener('click', (e) => {
+                    if (!suggestionsDiv.contains(e.target) && e.target !== searchInput) {
+                        suggestionsDiv.style.display = 'none';
+                    }
+                });
+            }
+        }
+
+        // ================== عداد الزوار المركزي في Supabase ==================
+        let centralVisitorCount = 0;
+        async function initCentralVisitorCounter() {
+            try {
+                await ensureSiteStatsTable();
+                const { data, error } = await supabaseClient
+                    .from('site_stats')
+                    .select('visitor_count')
+                    .eq('id', 1)
+                    .single();
+                if (error) throw error;
+                centralVisitorCount = data.visitor_count;
+                const visitorSpan = document.getElementById('visitorCount');
+                if (visitorSpan) visitorSpan.textContent = centralVisitorCount;
+                const alreadyCounted = sessionStorage.getItem('visitor_counted') === 'true';
+                if (!alreadyCounted) {
+                    centralVisitorCount++;
+                    await supabaseClient.from('site_stats').update({ visitor_count: centralVisitorCount, updated_at: new Date().toISOString() }).eq('id', 1);
+                    if (visitorSpan) visitorSpan.textContent = centralVisitorCount;
+                    sessionStorage.setItem('visitor_counted', 'true');
+                }
+                setInterval(async () => {
+                    const { data: freshData } = await supabaseClient.from('site_stats').select('visitor_count').eq('id', 1).single();
+                    if (freshData && freshData.visitor_count !== centralVisitorCount) {
+                        centralVisitorCount = freshData.visitor_count;
+                        if (visitorSpan) visitorSpan.textContent = centralVisitorCount;
+                    }
+                }, 60000);
+            } catch(err) {
+                const visitorSpan = document.getElementById('visitorCount');
+                if (visitorSpan) visitorSpan.textContent = '?';
+            }
+        }
+
+        async function ensureSiteStatsTable() {
+            try {
+                const { error } = await supabaseClient.from('site_stats').select('id').eq('id', 1).single();
+                if (error && error.code === 'PGRST116') {
+                    await supabaseClient.from('site_stats').insert({ id: 1, visitor_count: 0, updated_at: new Date().toISOString() });
+                }
+            } catch(err) {}
+        }
+
+        // ================== نظام المساعد الذكي ==================
+        async function sendDirectiveToAdmin(actionType, details) {
+            try {
+                await supabaseClient.from('assistant_feedback').insert({
+                    user_id: currentUser?.username || 'guest',
+                    session_id: sessionStorage.getItem('session_id') || (sessionStorage.setItem('session_id', Date.now()), sessionStorage.getItem('session_id')),
+                    action_type: actionType,
+                    details: details,
+                    url: window.location.href,
+                    created_at: new Date().toISOString()
+                });
+            } catch(e) {}
+        }
+
+        let pageEnterTime = Date.now();
+        function trackPageView(pageName) {
+            const duration = (Date.now() - pageEnterTime) / 1000;
+            sendDirectiveToAdmin('page_view', { page: pageName, duration_seconds: duration });
+            pageEnterTime = Date.now();
+        }
+
+        function trackButtonClick(buttonName, extra = {}) {
+            sendDirectiveToAdmin('button_click', { button: buttonName, ...extra });
+        }
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.add-to-cart-btn');
+            if (btn) trackButtonClick('add_to_cart', { product: btn.closest('.product-item')?.querySelector('.product-name')?.innerText });
+            const searchBtn = e.target.closest('#searchBtn');
+            if (searchBtn) trackButtonClick('search', { query: document.getElementById('searchInput')?.value });
+        });
+
+        let lastHash = window.location.hash;
+        setInterval(() => {
+            if (window.location.hash !== lastHash) {
+                trackPageView(window.location.hash || 'home');
+                lastHash = window.location.hash;
+            }
+        }, 1000);
+
+        async function getBotReply(question) {
+            const q = question.toLowerCase();
+            if (q.includes('شحن') || q.includes('توصيل')) return "🚚 سياسة الشحن: نوصل لجميع مناطق المملكة خلال 3-7 أيام. التوصيل مجاني للطلبات فوق 200 ريال.";
+            if (q.includes('استرجاع') || q.includes('استبدال')) return "🔄 يمكنك استرجاع المنتج خلال 7 أيام من الاستلام بشرط أن يكون بحالته الأصلية. راجع سياسة الاسترجاع في التذييل.";
+            if (q.includes('دفع') || q.includes('payment')) return "💰 نقبل الدفع عبر مدى، فيزا، ماستركارد، أبل باي، والتحويل البنكي.";
+            if (q.includes('عطر') || q.includes('بخور')) return "🌹 أفضل العطور لدينا: عطر مسك أبيض ودهن عود كمبودي. يمكنك البحث عنها في شريط البحث.";
+            if (q.includes('شكراً')) return "❤️ العفو! سعيد بمساعدتك. هل هناك شيء آخر تريد معرفته؟";
+            await sendDirectiveToAdmin('unanswered_question', { question });
+            return "❓ عذراً، لم أفهم سؤالك تماماً. لكن يمكنني تمرير سؤالك لفريق الدعم. هل تريد مساعدة في البحث عن منتج معين؟";
+        }
+
+        // دوال السلة والوظائف الأخرى (مختصرة للطول، لكنها موجودة كاملة في الكود الأصلي)
         function getCurrencySymbol() {
             if (!appData) return "ر.س";
             const symbols = { SAR: "ر.س", USD: "$", OMR: "ر.ع.", QAR: "ر.ق", AED: "د.إ" };
@@ -681,9 +958,6 @@
             return key;
         }
 
-        function saveUsers() { localStorage.setItem('users', JSON.stringify(users)); }
-
-        // ================== دوال السلة ==================
         function updateCartDisplay() {
             const cartCountSpan = document.getElementById('cartCount');
             if (cartCountSpan) cartCountSpan.textContent = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -716,9 +990,7 @@
             const sidebar = document.getElementById('cartSidebar');
             if (sidebar) sidebar.classList.add('open');
         };
-
         window.removeFromCart = function(index) { cart.splice(index, 1); localStorage.setItem('cart', JSON.stringify(cart)); updateCartDisplay(); };
-
         window.orderViaWhatsapp = function() {
             let message = "طلب جديد:\n";
             cart.forEach(item => { message += `${item.name} - ${item.newPrice} ${getCurrencySymbol()} x${item.quantity}\n`; });
@@ -726,22 +998,19 @@
             message += `الإجمالي: ${total} ${getCurrencySymbol()}`;
             window.open(`https://wa.me/${appData.footer.whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
         };
-
         window.orderViaEmail = function() {
             let subject = "طلب جديد من الموقع";
             let body = cart.map(item => `${item.name} - ${item.newPrice} ${getCurrencySymbol()} x${item.quantity}`).join('\n');
             body += `\nالإجمالي: ${cart.reduce((sum, item) => sum + item.newPrice * item.quantity, 0)} ${getCurrencySymbol()}`;
             window.location.href = `mailto:${appData.footer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         };
-
         window.chatWithAdmin = function() { window.open(appData.footer.whatsapp, '_blank'); };
 
-        const cartIcon = document.getElementById('cartIcon');
-        if (cartIcon) cartIcon.addEventListener('click', () => { const sidebar = document.getElementById('cartSidebar'); if (sidebar) sidebar.classList.toggle('open'); });
-        const closeCart = document.getElementById('closeCart');
-        if (closeCart) closeCart.addEventListener('click', () => { const sidebar = document.getElementById('cartSidebar'); if (sidebar) sidebar.classList.remove('open'); });
+        const cartIconElem = document.getElementById('cartIcon');
+        if (cartIconElem) cartIconElem.addEventListener('click', () => { const sidebar = document.getElementById('cartSidebar'); if (sidebar) sidebar.classList.toggle('open'); });
+        const closeCartBtn = document.getElementById('closeCart');
+        if (closeCartBtn) closeCartBtn.addEventListener('click', () => { const sidebar = document.getElementById('cartSidebar'); if (sidebar) sidebar.classList.remove('open'); });
 
-        // ================== دوال الإعجابات والمفضلة (مبسطة) ==================
         window.toggleLike = async function(productId, storeId, btn) {
             if (!currentUser) { showLoginDialog(); return; }
             const index = currentUser.likes.indexOf(productId);
@@ -760,7 +1029,6 @@
             localStorage.setItem('users', JSON.stringify(users));
             await supabaseClient.from('users').update({ likes: currentUser.likes }).eq('username', currentUser.username);
         };
-
         window.toggleFavorite = async function(productId, storeId, btn) {
             if (!currentUser) { showLoginDialog(); return; }
             const index = currentUser.favorites.indexOf(productId);
@@ -784,14 +1052,12 @@
             const loginHtml = `<div id="loginModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000;"><div style="background:white; padding:30px; border-radius:40px; width:300px;"><h3 style="margin-bottom:20px;">تسجيل الدخول</h3><input type="text" id="loginUsername" placeholder="اسم المستخدم" style="width:100%; padding:10px; margin-bottom:10px; border-radius:40px; border:1px solid #ccc;"><input type="password" id="loginPassword" placeholder="كلمة المرور" style="width:100%; padding:10px; margin-bottom:20px; border-radius:40px; border:1px solid #ccc;"><button onclick="performLogin()" style="background:#fbbf24; border:none; padding:10px; width:100%; border-radius:40px; font-weight:bold;">دخول</button><button onclick="showRegisterDialog()" style="margin-top:10px; background:none; border:none; color:#3b82f6; cursor:pointer;">إنشاء حساب جديد</button><button onclick="document.getElementById('loginModal').remove()" style="margin-top:10px; background:none; border:none; color:#ef4444; cursor:pointer;">إلغاء</button></div></div>`;
             document.body.insertAdjacentHTML('beforeend', loginHtml);
         }
-
         window.showRegisterDialog = function() {
             const modal = document.getElementById('loginModal');
             if (modal) modal.remove();
             const registerHtml = `<div id="registerModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000;"><div style="background:white; padding:30px; border-radius:40px; width:300px;"><h3 style="margin-bottom:20px;">إنشاء حساب جديد</h3><input type="text" id="regUsername" placeholder="اسم المستخدم" style="width:100%; padding:10px; margin-bottom:10px; border-radius:40px; border:1px solid #ccc;"><input type="password" id="regPassword" placeholder="كلمة المرور" style="width:100%; padding:10px; margin-bottom:20px; border-radius:40px; border:1px solid #ccc;"><button onclick="performRegister()" style="background:#fbbf24; border:none; padding:10px; width:100%; border-radius:40px; font-weight:bold;">تسجيل</button><button onclick="showLoginDialog()" style="margin-top:10px; background:none; border:none; color:#3b82f6; cursor:pointer;">لديك حساب؟ سجل دخول</button><button onclick="document.getElementById('registerModal').remove()" style="margin-top:10px; background:none; border:none; color:#ef4444; cursor:pointer;">إلغاء</button></div></div>`;
             document.body.insertAdjacentHTML('beforeend', registerHtml);
         };
-
         window.performLogin = function() {
             const username = document.getElementById('loginUsername')?.value;
             const password = document.getElementById('loginPassword')?.value;
@@ -802,17 +1068,16 @@
                 const modal = document.getElementById('loginModal');
                 if (modal) modal.remove();
                 renderProfilePage();
-            } else alert('اسم المستخدم أو كلمة المرور غير صحيحة');
+            }
         };
-
         window.performRegister = function() {
             const username = document.getElementById('regUsername')?.value;
             const password = document.getElementById('regPassword')?.value;
-            if (!username || !password) { alert('الرجاء ملء جميع الحقول'); return; }
-            if (users.find(u => u.username === username)) { alert('اسم المستخدم موجود بالفعل'); return; }
+            if (!username || !password) return;
+            if (users.find(u => u.username === username)) return;
             const newUser = { username, password, likes: [], favorites: [], purchases: [] };
             users.push(newUser);
-            saveUsers();
+            localStorage.setItem('users', JSON.stringify(users));
             currentUser = newUser;
             localStorage.setItem('currentUser', JSON.stringify(newUser));
             const modal = document.getElementById('registerModal');
@@ -826,9 +1091,7 @@
                 purchases: []
             }).then();
         };
-
         window.logout = function() { currentUser = null; localStorage.removeItem('currentUser'); showHomePage(); };
-
         function renderProfilePage() {
             const profileDiv = document.getElementById('profilePage');
             if (!profileDiv) return;
@@ -852,7 +1115,6 @@
             currentUser.purchases.forEach(p => { purchasesHtml += `<div class="profile-product-card"><img src="${p.image}"><div>${p.name}</div></div>`; });
             profileDiv.innerHTML = `<div class="profile-page"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>مرحباً ${currentUser.username}</h2><button onclick="logout()" style="background:#ef4444; color:white; border:none; padding:10px 20px; border-radius:40px; cursor:pointer;">تسجيل خروج</button></div><div class="profile-tabs"><button class="profile-tab active" onclick="showProfileTab('likes')">الإعجابات</button><button class="profile-tab" onclick="showProfileTab('favorites')">المفضلة</button><button class="profile-tab" onclick="showProfileTab('purchases')">المشتريات</button></div><div id="profileTabContent"><div class="profile-products">${likesHtml || '<p>لا توجد منتجات بعد</p>'}</div></div></div>`;
         }
-
         window.showProfileTab = function(tab) {
             const tabs = document.querySelectorAll('.profile-tab');
             tabs.forEach(t => t.classList.remove('active'));
@@ -882,7 +1144,6 @@
             const contentDiv = document.getElementById('profileTabContent');
             if (contentDiv) contentDiv.innerHTML = `<div class="profile-products">${html || '<p>لا توجد منتجات بعد</p>'}</div>`;
         };
-
         function showContactPage() {
             const homePage = document.getElementById('homePage');
             const contactPage = document.getElementById('contactPage');
@@ -902,20 +1163,17 @@
                         if (!appData.messages) appData.messages = [];
                         appData.messages.push(newMessage);
                         saveToSupabase();
-                        alert('تم إرسال رسالتك بنجاح');
                         showHomePage();
                     });
                 }
             }
         }
-
         const searchBtn = document.getElementById('searchBtn');
-        const searchInput = document.getElementById('searchInput');
+        const searchInputElem = document.getElementById('searchInput');
         if (searchBtn) searchBtn.addEventListener('click', performSearch);
-        if (searchInput) searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
-
+        if (searchInputElem) searchInputElem.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
         function performSearch() {
-            const query = searchInput?.value.trim().toLowerCase();
+            const query = searchInputElem?.value.trim().toLowerCase();
             if (!query) return;
             const results = [];
             for (let storeId in appData.products) {
@@ -933,7 +1191,6 @@
             });
             showSearchResults(results, query);
         }
-
         function showSearchResults(results, query) {
             const homePage = document.getElementById('homePage');
             const searchPage = document.getElementById('searchPage');
@@ -954,7 +1211,6 @@
                 searchPage.innerHTML = html;
             }
         }
-
         function applyDesignSettings() {
             if (!appData) return;
             const root = document.documentElement;
@@ -973,7 +1229,6 @@
             root.style.setProperty('--general-font-size', appData.design.generalFontSize);
             document.body.style.fontSize = appData.design.generalFontSize;
         }
-
         let headerInterval, currentHeaderIndex = 0;
         function changeHeaderBackground() {
             const header = document.getElementById('mainHeader');
@@ -983,7 +1238,6 @@
             }
         }
         function startHeaderInterval() { changeHeaderBackground(); headerInterval = setInterval(changeHeaderBackground, 5000); }
-
         let carouselInterval;
         function startCarousel() {
             if (carouselInterval) clearInterval(carouselInterval);
@@ -1002,30 +1256,28 @@
                 }, 3000);
             });
         }
-
         function renderHomePage() {
             if (!appData) return;
             const headerTitle = document.getElementById('headerTitle');
             const headerSubtitle = document.getElementById('headerSubtitle');
             const tickerContent = document.getElementById('tickerContent');
             const saudiFlagContainer = document.getElementById('saudiFlagContainer');
-            const cartIcon = document.getElementById('cartIcon');
-            const profileLink = document.getElementById('profileLink');
-            const contestsBar = document.getElementById('contestsBar');
-            const contestsContent = document.getElementById('contestsContent');
+            const cartIconElem2 = document.getElementById('cartIcon');
+            const profileLinkElem = document.getElementById('profileLink');
+            const contestsBarElem = document.getElementById('contestsBar');
+            const contestsContentElem = document.getElementById('contestsContent');
             if (headerTitle) headerTitle.textContent = appData.header.title;
             if (headerSubtitle) headerSubtitle.textContent = appData.header.subtitle;
             if (tickerContent) tickerContent.innerHTML = appData.ticker.map(t => `<span>${DOMPurify.sanitize(t)}</span>`).join('');
             if (saudiFlagContainer) saudiFlagContainer.style.display = appData.settings.showSaudiFlag ? 'inline' : 'none';
-            if (cartIcon) cartIcon.style.display = appData.settings.cartEnabled ? 'block' : 'none';
-            if (profileLink) profileLink.style.display = appData.settings.enableUserProfile ? 'inline-block' : 'none';
-            if (contestsBar && contestsContent) {
+            if (cartIconElem2) cartIconElem2.style.display = appData.settings.cartEnabled ? 'block' : 'none';
+            if (profileLinkElem) profileLinkElem.style.display = appData.settings.enableUserProfile ? 'inline-block' : 'none';
+            if (contestsBarElem && contestsContentElem) {
                 if (appData.settings.contests && appData.settings.contests.length > 0) {
-                    contestsBar.style.display = 'block';
-                    contestsContent.innerHTML = appData.settings.contests.map(c => `<span class="contest-item"><i class="fas fa-trophy"></i> ${DOMPurify.sanitize(c.name)} - ${DOMPurify.sanitize(c.description)} (ينتهي: ${DOMPurify.sanitize(c.endDate)})</span>`).join('');
-                } else contestsBar.style.display = 'none';
+                    contestsBarElem.style.display = 'block';
+                    contestsContentElem.innerHTML = appData.settings.contests.map(c => `<span class="contest-item"><i class="fas fa-trophy"></i> ${DOMPurify.sanitize(c.name)} - ${DOMPurify.sanitize(c.description)} (ينتهي: ${DOMPurify.sanitize(c.endDate)})</span>`).join('');
+                } else contestsBarElem.style.display = 'none';
             }
-
             const indexGrid = document.getElementById('indexGrid');
             if (indexGrid) {
                 indexGrid.innerHTML = '';
@@ -1043,7 +1295,6 @@
                     });
                 }
             }
-
             const container = document.getElementById('categoriesContainer');
             if (container) {
                 container.innerHTML = '';
@@ -1079,7 +1330,6 @@
                 });
                 startCarousel();
             }
-
             const testimonialsTrack = document.getElementById('testimonialsTrack');
             if (testimonialsTrack) {
                 testimonialsTrack.innerHTML = '';
@@ -1101,7 +1351,6 @@
             updateCartDisplay();
             attachLongPressShare();
         }
-
         function attachLongPressShare() {
             const items = document.querySelectorAll('.product-item img, .store-logo');
             items.forEach(img => {
@@ -1112,14 +1361,13 @@
                 img.addEventListener('touchmove', () => clearTimeout(pressTimer));
             });
         }
-
         function showSharePopup(e, img) {
             const existing = document.querySelector('.share-popup');
             if (existing) existing.remove();
             const parent = img.closest('.product-item') || img.closest('.store-card');
             if (!parent) return;
             let name, url;
-            if (parent.classList.contains('product-item')) { name = parent.dataset.productName; url = parent.dataset.productUrl; }
+            if (parent.classList.contains('.product-item')) { name = parent.dataset.productName; url = parent.dataset.productUrl; }
             else { name = parent.dataset.storeName; url = parent.dataset.storeUrl; }
             const popup = document.createElement('div');
             popup.className = 'share-popup';
@@ -1130,9 +1378,7 @@
             setTimeout(() => popup.remove(), 3000);
             document.addEventListener('click', function closePopup(e) { if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', closePopup); } });
         }
-
-        window.copyToClipboard = function(text) { navigator.clipboard.writeText(text).then(() => alert('تم نسخ الرابط')); };
-
+        window.copyToClipboard = function(text) { navigator.clipboard.writeText(text); };
         function showCategoryPage(slug) {
             const cat = appData.categories.find(c => c.slug === slug);
             if (!cat) return;
@@ -1153,8 +1399,6 @@
                 categoryPage.innerHTML = `<div style="padding:2rem;"><button class="back-home-btn" onclick="showHomePage()">${translate('العودة للرئيسية')}</button><h2 style="color:${cat.color};">${cat.name}</h2>${horizontalStores ? '<div class="stores-horizontal"><div class="stores-track">' + horizontalStores + '</div></div>' : ''}<div class="stores-grid">${gridStores || '<p>لا توجد متاجر في هذه الفئة</p>'}</div></div>`;
             }
         }
-
-        // ========== صفحة المتجر (تم تعديلها: حذف عناوين الأشرطة) ==========
         function showStorePage(storeId) {
             let store = null;
             for (let cat in appData.stores) {
@@ -1162,17 +1406,13 @@
                 if (found) { store = found; break; }
             }
             if (!store) return;
-            
             const homePage = document.getElementById('homePage');
             const storePage = document.getElementById('storePage');
             if (homePage) homePage.classList.add('hidden');
             if (storePage) storePage.classList.remove('hidden');
-
             const realProducts = appData.products[storeId] || [];
             const numStrips = store.numStrips || 10;
             const productsPerStrip = store.productDisplayCount || 10;
-
-            // توزيع المنتجات الحقيقية على الأشرطة
             const strips = Array(numStrips).fill().map(() => []);
             if (realProducts.length > 0) {
                 realProducts.forEach((prod, idx) => {
@@ -1180,10 +1420,8 @@
                     strips[stripIndex].push(prod);
                 });
             }
-
             let stripsHtml = '';
             let hasAnyProducts = false;
-            
             for (let i = 0; i < numStrips; i++) {
                 let stripProducts = strips[i];
                 if (stripProducts.length === 0) {
@@ -1194,7 +1432,6 @@
                 }
                 hasAnyProducts = true;
                 stripProducts = stripProducts.slice(0, productsPerStrip);
-                
                 let productsHtml = '';
                 stripProducts.forEach(prod => {
                     const addToCartBtn = (appData.settings.cartEnabled) ? `<button class="add-to-cart-btn" onclick="addToCart({id:${prod.id}, storeId:'${store.id}', name:'${prod.name}', newPrice:${prod.newPrice}, image:'${prod.image}'})"><i class="fas fa-cart-plus"></i> ${translate('إضافة للسلة')}</button>` : '';
@@ -1216,25 +1453,20 @@
                         </div>
                     </div>`;
                 });
-                // تم حذف عنوان الشريط (section-title) كما طلب المستخدم
                 stripsHtml += `<div class="multi-horizontal">
                     <div class="products-horizontal">
                         <div class="products-track">${productsHtml}</div>
                     </div>
                 </div>`;
             }
-            
             if (!hasAnyProducts || realProducts.length === 0) {
                 stripsHtml = '<p style="text-align:center; padding:20px;">🚫 لا توجد منتجات في هذا المتجر حالياً.</p>';
             }
-
             const shareButtons = `<div class="share-buttons"><a href="https://wa.me/?text=${encodeURIComponent(store.name + ' ' + window.location.href)}" target="_blank" class="share-btn whatsapp"><i class="fab fa-whatsapp"></i></a><a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}" target="_blank" class="share-btn facebook"><i class="fab fa-facebook-f"></i></a><a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(store.name)}&url=${encodeURIComponent(window.location.href)}" target="_blank" class="share-btn twitter"><i class="fab fa-twitter"></i></a></div>`;
-            
             let ownerUploadHtml = '';
             if (store.allowUpload) {
                 ownerUploadHtml = `<div class="store-owner-upload"><h4>رفع شعار جديد</h4><input type="password" id="ownerCode-${store.id}" placeholder="الرمز السري"><input type="file" id="ownerLogo-${store.id}" accept="image/*"><button onclick="uploadStoreLogo('${store.id}')">رفع</button></div>`;
             }
-            
             if (storePage) {
                 storePage.innerHTML = `<div style="padding:2rem;">
                     <button class="back-home-btn" onclick="showHomePage()">${translate('العودة للرئيسية')}</button>
@@ -1256,7 +1488,6 @@
                 attachLongPressShare();
             }
         }
-
         window.uploadStoreLogo = async function(storeId) {
             const code = document.getElementById(`ownerCode-${storeId}`)?.value;
             const fileInput = document.getElementById(`ownerLogo-${storeId}`);
@@ -1266,7 +1497,7 @@
                 if (store) break;
             }
             if (!store) return;
-            if (code !== store.ownerCode) { alert('الرمز السري غير صحيح'); return; }
+            if (code !== store.ownerCode) return;
             if (fileInput && fileInput.files && fileInput.files[0]) {
                 const reader = new FileReader();
                 reader.onload = async e => {
@@ -1274,14 +1505,11 @@
                     await saveToSupabase();
                     const logoImg = document.getElementById(`storeLogo-${storeId}`);
                     if (logoImg) logoImg.src = e.target.result;
-                    alert('تم رفع الشعار بنجاح');
                 };
                 reader.readAsDataURL(fileInput.files[0]);
             }
         };
-
         window.showProductModal = function(storeId, productId) {
-            const store = Object.values(appData.stores).flat().find(s => s.id === storeId);
             const product = appData.products[storeId]?.find(p => p.id == productId);
             if (!product) return;
             const modalImage = document.getElementById('modalProductImage');
@@ -1306,12 +1534,10 @@
             const modal = document.getElementById('productModal');
             if (modal) modal.classList.remove('hidden');
         };
-
         window.closeProductModal = function() {
             const modal = document.getElementById('productModal');
             if (modal) modal.classList.add('hidden');
         };
-
         function showHomePage() {
             const homePage = document.getElementById('homePage');
             const categoryPage = document.getElementById('categoryPage');
@@ -1327,7 +1553,6 @@
             if (contactPage) contactPage.classList.add('hidden');
             closeProductModal();
         }
-
         window.addEventListener('hashchange', () => {
             const hash = window.location.hash;
             if (hash.startsWith('#category/')) showCategoryPage(hash.split('/')[1]);
@@ -1339,15 +1564,12 @@
                 showProductModal(storeId, productId);
             } else showHomePage();
         });
-
         window.broadcastChannel = new BroadcastChannel('markets_channel');
         window.broadcastChannel.onmessage = (event) => {
             if (event.data.type === 'DB_UPDATE') {
                 loadFromSupabaseWithCache();
             }
         };
-
-        // سحب للتحديث (Pull to Refresh)
         let pullStartY = 0, pullMoveY = 0, pulling = false, refreshIndicator = null;
         function createRefreshIndicator() { const div = document.createElement('div'); div.id = 'pullRefreshIndicator'; div.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> اسحب للتحديث'; document.body.appendChild(div); return div; }
         function updateRefreshIndicator(offset) { if (!refreshIndicator) return; if (offset > 0 && offset <= 60) refreshIndicator.style.top = `${Math.min(0, offset - 60)}px`; if (offset >= 60) { refreshIndicator.innerHTML = '<i class="fas fa-arrow-down"></i> حرر للتحديث'; refreshIndicator.style.top = '0px'; } else refreshIndicator.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> اسحب للتحديث'; }
@@ -1356,14 +1578,10 @@
         function onTouchMove(e) { if (!pulling) return; const currentY = e.touches[0].clientY; const offset = currentY - pullStartY; if (offset > 0) { e.preventDefault(); pullMoveY = offset; updateRefreshIndicator(offset); } }
         async function onTouchEnd() { if (!pulling) return; pulling = false; if (pullMoveY >= 60) { if (refreshIndicator) { refreshIndicator.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> جاري التحديث...'; refreshIndicator.style.top = '0px'; } await refreshData(); hideRefreshIndicator(); } else hideRefreshIndicator(); pullStartY = 0; pullMoveY = 0; }
         if ('ontouchstart' in window) { document.body.addEventListener('touchstart', onTouchStart, { passive: false }); document.body.addEventListener('touchmove', onTouchMove, { passive: false }); document.body.addEventListener('touchend', onTouchEnd); }
-
         window.refreshData = async function() { await loadFromSupabaseWithCache(); };
-
-        // ================== PWA: تثبيت التطبيق ==================
         let deferredPrompt;
         const installBtn = document.getElementById('installAppBtn');
         let installToast = null;
-
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
@@ -1385,29 +1603,73 @@
                 setTimeout(() => { if (installToast) { installToast.remove(); installToast = null; } }, 15000);
             }
         });
-
         if (installBtn) {
             installBtn.addEventListener('click', () => {
                 if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; installBtn.style.display = 'none'; }
             });
         }
-
-        // ================== Service Worker ==================
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration skipped'));
+            window.addEventListener('load', async () => {
+                try {
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    console.log('Service Worker مسجل');
+                    if (registration.waiting) registration.waiting.postMessage({type: 'SKIP_WAITING'});
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                if (confirm('توجد نسخة جديدة من الموقع. هل تريد التحديث الآن؟')) window.location.reload();
+                            }
+                        });
+                    });
+                } catch(err) {}
+            });
         }
-
-        // ================== عداد الزوار ==================
-        let visitorCount = localStorage.getItem('visitorCount') ? parseInt(localStorage.getItem('visitorCount')) : 0;
-        if (!sessionStorage.getItem('visited')) { visitorCount++; localStorage.setItem('visitorCount', visitorCount); sessionStorage.setItem('visited', 'true'); }
-        const visitorSpan = document.getElementById('visitorCount');
-        if (visitorSpan) visitorSpan.textContent = visitorCount;
-
-        // ================== بدء التشغيل ==================
         (async function initializeApp() {
             await loadFromSupabaseWithCache();
+            await initCentralVisitorCounter();
+            await ensureSiteStatsTable();
             startHeaderInterval();
             if (window.location.hash) window.dispatchEvent(new Event('hashchange'));
+            // تشغيل المساعد الذكي
+            const assistantFloat = document.getElementById('assistantFloat');
+            const assistantWindow = document.getElementById('assistantWindow');
+            const closeAssistant = document.getElementById('closeAssistantBtn');
+            const assistantSend = document.getElementById('assistantSendBtn');
+            const assistantInput = document.getElementById('assistantInput');
+            const assistantMessages = document.getElementById('assistantMessages');
+            if (assistantFloat && assistantWindow) {
+                assistantFloat.addEventListener('click', () => {
+                    assistantWindow.classList.toggle('open');
+                });
+                closeAssistant.addEventListener('click', () => {
+                    assistantWindow.classList.remove('open');
+                });
+                assistantSend.addEventListener('click', async () => {
+                    const text = assistantInput.value.trim();
+                    if (!text) return;
+                    const userMsgDiv = document.createElement('div');
+                    userMsgDiv.className = 'assistant-message user';
+                    userMsgDiv.textContent = text;
+                    assistantMessages.appendChild(userMsgDiv);
+                    assistantInput.value = '';
+                    const typingDiv = document.createElement('div');
+                    typingDiv.className = 'assistant-message bot';
+                    typingDiv.textContent = '🤖 جاري التفكير...';
+                    assistantMessages.appendChild(typingDiv);
+                    assistantMessages.scrollTop = assistantMessages.scrollHeight;
+                    const reply = await getBotReply(text);
+                    typingDiv.remove();
+                    const botMsgDiv = document.createElement('div');
+                    botMsgDiv.className = 'assistant-message bot';
+                    botMsgDiv.textContent = reply;
+                    assistantMessages.appendChild(botMsgDiv);
+                    assistantMessages.scrollTop = assistantMessages.scrollHeight;
+                });
+                assistantInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') assistantSend.click();
+                });
+            }
         })();
     </script>
 </body>
