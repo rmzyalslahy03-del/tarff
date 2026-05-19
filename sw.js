@@ -1,75 +1,123 @@
-// sw.js - Service Worker لتخزين الملفات الثابتة وتشغيل الموقع بدون إنترنت
-const CACHE_NAME = 'markets-pwa-v4';
+// sw.js - Service Worker متقدم لتخزين الموقع بالكامل على متصفحات الزوار
+// الإصدار النهائي - يدعم التخزين المؤقت، التحديث التلقائي، والعمل بدون إنترنت
+
+const CACHE_NAME = 'asawq-store-v5';
 const STATIC_ASSETS = [
-  './',
-  './index.html',
-  './admin.html',
-  './manifest.json',
+  '/',
+  '/index.html',
+  '/admin.html',
+  '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  'https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js'
 ];
 
+// تثبيت الـ Service Worker وتخزين الملفات الأساسية
 self.addEventListener('install', event => {
+  console.log('[SW] تثبيت الإصدار الجديد');
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('[SW] تخزين الملفات الأساسية');
+        return cache.addAll(STATIC_ASSETS);
+      })
+      .catch(err => console.error('[SW] فشل تخزين بعض الملفات:', err))
   );
-  self.skipWaiting();
+  self.skipWaiting(); // تفعيل فوراً
 });
 
+// تفعيل الـ SW وحذف المخازن القديمة
 self.addEventListener('activate', event => {
+  console.log('[SW] تفعيل الإصدار الجديد');
   event.waitUntil(
-    caches.keys().then(cacheNames =>
-      Promise.all(cacheNames.map(name => name !== CACHE_NAME && caches.delete(name)))
-    )
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(name => {
+          if (name !== CACHE_NAME) {
+            console.log('[SW] حذف الكاش القديم:', name);
+            return caches.delete(name);
+          }
+        })
+      );
+    })
   );
-  self.clients.claim();
+  self.clients.claim(); // السيطرة على الصفحات المفتوحة فوراً
 });
 
+// استراتيجية متقدمة للتعامل مع الطلبات
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
   const request = event.request;
-
-  // استثناء طلبات Supabase API
-  if (url.pathname.includes('/rest/v1/') || url.hostname.includes('supabase.co')) {
-    event.respondWith(fetch(request).catch(() => new Response(JSON.stringify({ error: 'offline' }), {
+  const url = new URL(request.url);
+  
+  // استثناء طلبات Supabase API (لا نخزنها محلياً)
+  if (url.hostname.includes('supabase.co') || url.pathname.includes('/rest/v1/')) {
+    event.respondWith(fetch(request).catch(() => new Response(JSON.stringify({ offline: true }), {
+      status: 503,
       headers: { 'Content-Type': 'application/json' }
     })));
     return;
   }
-
-  // للملفات الثابتة: Cache First
-  if (['document', 'style', 'script', 'font'].includes(request.destination) || url.pathname === '/manifest.json') {
+  
+  // للملفات الثابتة (HTML, CSS, JS, fonts) - استراتيجية Cache First مع تحديث الخلفية
+  if (request.destination === 'document' || 
+      request.destination === 'style' || 
+      request.destination === 'script' || 
+      request.destination === 'font' ||
+      url.pathname === '/' ||
+      url.pathname === '/index.html' ||
+      url.pathname === '/admin.html' ||
+      url.pathname === '/manifest.json') {
+    
     event.respondWith(
-      caches.match(request).then(cached => cached || fetch(request).then(res => {
-        if (res.status === 200) caches.open(CACHE_NAME).then(cache => cache.put(request, res.clone()));
-        return res;
-      }))
+      caches.match(request).then(cachedResponse => {
+        const fetchPromise = fetch(request).then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(request, networkResponse.clone());
+            });
+          }
+          return networkResponse;
+        }).catch(() => cachedResponse);
+        
+        return cachedResponse || fetchPromise;
+      })
     );
     return;
   }
-
-  // للصور: Cache First ثم تحديث في الخلفية
+  
+  // للصور - Cache First ثم تحديث في الخلفية
   if (request.destination === 'image') {
     event.respondWith(
       caches.match(request).then(cached => {
         const fetchPromise = fetch(request).then(res => {
-          if (res.status === 200) caches.open(CACHE_NAME).then(cache => cache.put(request, res.clone()));
+          if (res && res.status === 200) {
+            caches.open(CACHE_NAME).then(cache => cache.put(request, res.clone()));
+          }
           return res;
-        });
+        }).catch(() => null);
         return cached || fetchPromise;
       })
     );
     return;
   }
-
-  // لكل شيء آخر: Network First
+  
+  // لجميع الطلبات الأخرى (مثل API خارجية) - Network First
   event.respondWith(
-    fetch(request).then(res => {
-      if (res.status === 200 && request.method === 'GET') caches.open(CACHE_NAME).then(cache => cache.put(request, res.clone()));
-      return res;
+    fetch(request).then(networkResponse => {
+      if (networkResponse && networkResponse.status === 200 && request.method === 'GET') {
+        caches.open(CACHE_NAME).then(cache => cache.put(request, networkResponse.clone()));
+      }
+      return networkResponse;
     }).catch(() => caches.match(request))
   );
+});
+
+// استقبال رسائل من الصفحة لتحديث فوري
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
